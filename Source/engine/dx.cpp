@@ -143,7 +143,7 @@ void dx_cleanup()
 #ifndef USE_SDL1
 	texture = nullptr;
 	FreeVirtualGamepadTextures();
-	if (*GetOptions().Graphics.upscale)
+	if (renderer != nullptr)
 		SDL_DestroyRenderer(renderer);
 #endif
 	SDL_DestroyWindow(ghMainWnd);
@@ -156,6 +156,7 @@ void CreateBackBuffer()
 		PalSurface = GetOutputSurface();
 		RenderDirectlyToOutputSurface = true;
 	} else {
+		RenderDirectlyToOutputSurface = false;
 		PinnedPalSurface = SDLWrap::CreateRGBSurfaceWithFormat(
 		    /*flags=*/0,
 		    /*width=*/gnScreenWidth,

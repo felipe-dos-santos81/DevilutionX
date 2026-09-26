@@ -889,13 +889,13 @@ void ResizeWindow()
 #endif
 	}
 
-	// Handle switching between "fake fullscreen" and "true fullscreen" when upscale is toggled
-	const bool upscaleChanged = *GetOptions().Graphics.upscale != (renderer != nullptr);
-	if (upscaleChanged && *GetOptions().Graphics.fullscreen) {
+	// Handle switching between "fake fullscreen" and "true fullscreen" when renderer scaling is toggled
+	const bool rendererScalingChanged = RendererScalingActive() != (renderer != nullptr);
+	if (rendererScalingChanged && *GetOptions().Graphics.fullscreen) {
 #ifdef USE_SDL3
 		if (!SDL_SetWindowFullscreen(ghMainWnd, *GetOptions().Graphics.fullscreen)) ErrSdl();
 #else
-		const Uint32 flags = *GetOptions().Graphics.upscale ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
+		const Uint32 flags = RendererScalingActive() ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
 		if (SDL_SetWindowFullscreen(ghMainWnd, flags) != 0) ErrSdl();
 #endif
 		if (!*GetOptions().Graphics.fullscreen)
