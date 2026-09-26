@@ -88,6 +88,7 @@ extern uint16_t gnTickDelay;
 extern char gszProductName[64];
 
 extern PlayerActionType LastPlayerAction;
+extern bool FollowCursor;
 
 void InitKeymapActions();
 void SetCursorPos(Point position);

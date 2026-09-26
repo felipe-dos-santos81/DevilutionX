@@ -62,6 +62,13 @@ void RepeatPlayerAction()
 	if (pcurs != CURSOR_HAND)
 		return;
 
+	if (FollowCursor && sgbMouseDown == CLICK_NONE && ControllerActionHeld == GameActionType_NONE) {
+		Player &followPlayer = *MyPlayer;
+		if (!IsPlayerInStore() && followPlayer.destAction == ACTION_NONE && !followPlayer._pInvincible && followPlayer.CanChangeAction())
+			RepeatWalk(followPlayer);
+		return;
+	}
+
 	if (sgbMouseDown == CLICK_NONE && ControllerActionHeld == GameActionType_NONE)
 		return;
 

@@ -154,6 +154,7 @@ GameLogicStep gGameLogicStep = GameLogicStep::None;
 
 /** This and the following mouse variables are for handling in-game click-and-hold actions */
 PlayerActionType LastPlayerAction = PlayerActionType::None;
+bool FollowCursor = false;
 
 // Controller support: Actions to run after updating the cursor state.
 // Defined in SourceX/controls/plctrls.cpp.
@@ -194,6 +195,7 @@ void StartGame(interface_mode uMsg)
 	sgnTimeoutCurs = CURSOR_NONE;
 	sgbMouseDown = CLICK_NONE;
 	LastPlayerAction = PlayerActionType::None;
+	FollowCursor = false;
 }
 
 void FreeGame()
@@ -244,7 +246,7 @@ bool ProcessInput()
 	return true;
 }
 
-void LeftMouseCmd(bool bShift)
+void LeftMouseCmd(bool bShift, bool wasFollowingCursor)
 {
 	bool bNear;
 
@@ -261,12 +263,21 @@ void LeftMouseCmd(bool bShift)
 		if (pcursitem == -1 && pcursmonst == -1 && PlayerUnderCursor == nullptr) {
 			LastPlayerAction = PlayerActionType::Walk;
 			NetSendCmdLoc(MyPlayerId, true, CMD_WALKXY, cursPosition);
+			FollowCursor = *GetOptions().Gameplay.d4MouseControls && !wasFollowingCursor;
 		}
 		return;
 	}
 
 	const Player &myPlayer = *MyPlayer;
 	bNear = myPlayer.position.tile.WalkingDistance(cursPosition) < 2;
+	if (*GetOptions().Gameplay.d4MouseControls && !bShift) {
+		const bool hostileTarget = (pcursmonst != -1 && !CanTalkToMonst(Monsters[pcursmonst]))
+		    || (PlayerUnderCursor != nullptr && !PlayerUnderCursor->hasNoLife() && !myPlayer.friendlyMode);
+		if (hostileTarget && IsValidSpeedSpell(0)) {
+			CheckPlrSpell(false, myPlayer._pSplHotKey[0], myPlayer._pSplTHotKey[0]);
+			return;
+		}
+	}
 	if (pcursitem != -1 && pcurs == CURSOR_HAND && !bShift) {
 		NetSendCmdLocParam1(true, invflag ? CMD_GOTOGETITEM : CMD_GOTOAGETITEM, cursPosition, pcursitem);
 	} else if (ObjectUnderCursor != nullptr && !ObjectUnderCursor->IsDisabled() && (!bShift || (bNear && ObjectUnderCursor->_oBreak == 1))) {
@@ -311,6 +322,7 @@ void LeftMouseCmd(bool bShift)
 	if (!bShift && pcursitem == -1 && ObjectUnderCursor == nullptr && pcursmonst == -1 && PlayerUnderCursor == nullptr) {
 		LastPlayerAction = PlayerActionType::Walk;
 		NetSendCmdLoc(MyPlayerId, true, CMD_WALKXY, cursPosition);
+		FollowCursor = *GetOptions().Gameplay.d4MouseControls && !wasFollowingCursor;
 	}
 }
 
@@ -334,6 +346,8 @@ bool TryOpenDungeonWithMouse()
 void LeftMouseDown(uint16_t modState)
 {
 	LastPlayerAction = PlayerActionType::None;
+	const bool wasFollowingCursor = FollowCursor;
+	FollowCursor = false;
 
 	if (gmenu_left_mouse(true))
 		return;
@@ -407,7 +421,7 @@ void LeftMouseDown(uint16_t modState)
 			} else {
 				CheckLevelButton();
 				if (!LevelButtonDown)
-					LeftMouseCmd(isShiftHeld);
+					LeftMouseCmd(isShiftHeld, wasFollowingCursor);
 			}
 		}
 	} else {
@@ -706,7 +720,8 @@ void HandleMouseButtonDown(Uint8 button, uint16_t modState)
 void HandleMouseButtonUp(Uint8 button, uint16_t modState)
 {
 	if (sgbMouseDown == CLICK_LEFT && button == SDL_BUTTON_LEFT) {
-		LastPlayerAction = PlayerActionType::None;
+		if (!FollowCursor || LastPlayerAction != PlayerActionType::Walk)
+			LastPlayerAction = PlayerActionType::None;
 		sgbMouseDown = CLICK_NONE;
 		LeftMouseUp(modState);
 	} else if (sgbMouseDown == CLICK_RIGHT && button == SDL_BUTTON_RIGHT) {
@@ -3393,6 +3408,7 @@ void LoadGameLevelCalculateCursor()
 {
 	// Recalculate mouse selection of entities after level change/load
 	LastPlayerAction = PlayerActionType::None;
+	FollowCursor = false;
 	sgbMouseDown = CLICK_NONE;
 	ResetItemlabelHighlighted(); // level changed => item changed
 	pcursmonst = -1;             // ensure pcurstemp is set to a valid value

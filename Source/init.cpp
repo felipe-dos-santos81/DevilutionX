@@ -182,6 +182,7 @@ void MainWndProc(const SDL_Event &event)
 #endif
 		sgbMouseDown = CLICK_NONE;
 		LastPlayerAction = PlayerActionType::None;
+		FollowCursor = false;
 		RedrawEverything();
 		break;
 #ifdef USE_SDL3

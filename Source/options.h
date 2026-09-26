@@ -631,6 +631,8 @@ struct GameplayOptions : OptionCategoryBase {
 	OptionEntryBoolean disableCripplingShrines;
 	/** @brief Spell hotkeys instantly cast the spell. */
 	OptionEntryBoolean quickCast;
+	/** @brief Diablo 4 style mouse controls: left-click casts the primary (F5) skill at enemies, left-click on ground toggles cursor-following movement, right-click casts the secondary (readied) spell. */
+	OptionEntryBoolean d4MouseControls;
 	/** @brief Number of Healing potions to pick up automatically */
 	OptionEntryInt<int> numHealPotionPickup;
 	/** @brief Number of Full Healing potions to pick up automatically */
