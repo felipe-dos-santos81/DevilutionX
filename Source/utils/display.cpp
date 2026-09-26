@@ -143,8 +143,30 @@ void CalculateUIRectangle()
 	};
 }
 
+#ifndef USE_SDL1
+/** @brief True when the fixed 960p windowed mode is active: render at 640x480 and scale 2x into a fixed 1280x960 window. Ignored in fullscreen and when a resolution is forced (demo mode). */
+bool Windowed960pActive()
+{
+	return forceResolution.width == 0 && *GetOptions().Graphics.windowed960p && !*GetOptions().Graphics.fullscreen;
+}
+
+/** @brief True when output goes through the SDL renderer, i.e. upscaling or the 960p windowed mode. */
+bool RendererScalingActive()
+{
+	return *GetOptions().Graphics.upscale || Windowed960pActive();
+}
+#endif
+
 Size GetPreferredWindowSize()
 {
+#ifndef USE_SDL1
+	if (Windowed960pActive()) {
+		constexpr Size RenderSize { 640, 480 };
+		constexpr Size WindowSize { 1280, 960 };
+		AdjustToScreenGeometry(RenderSize);
+		return WindowSize;
+	}
+#endif
 	Size windowSize = forceResolution.width != 0 ? forceResolution : *GetOptions().Graphics.resolution;
 
 #ifndef USE_SDL1
@@ -158,22 +180,9 @@ Size GetPreferredWindowSize()
 
 const auto OptionChangeHandlerResolution = (GetOptions().Graphics.resolution.SetValueChangedCallback(ResizeWindow), true);
 const auto OptionChangeHandlerFullscreen = (GetOptions().Graphics.fullscreen.SetValueChangedCallback(SetFullscreenMode), true);
-
-void OptionGrabInputChanged()
-{
-#ifdef USE_SDL3
-	if (ghMainWnd != nullptr) {
-		SDL_SetWindowMouseGrab(ghMainWnd, *GetOptions().Gameplay.grabInput);
-	}
-#elif !defined(USE_SDL1)
-	if (ghMainWnd != nullptr) {
-		SDL_SetWindowGrab(ghMainWnd, *GetOptions().Gameplay.grabInput ? SDL_TRUE : SDL_FALSE);
-	}
-#else
-	SDL_WM_GrabInput(*GetOptions().Gameplay.grabInput ? SDL_GRAB_ON : SDL_GRAB_OFF);
+#ifndef USE_SDL1
+const auto OptionChangeHandlerWindowed960p = (GetOptions().Graphics.windowed960p.SetValueChangedCallback(ResizeWindow), true);
 #endif
-}
-const auto OptionChangeHandlerGrabInput = (GetOptions().Gameplay.grabInput.SetValueChangedCallback(OptionGrabInputChanged), true);
 
 void UpdateAvailableResolutions()
 {
@@ -605,8 +614,6 @@ bool SpawnWindow(const char *lpWindowName)
 #ifdef USE_SDL1
 	SDL_WM_SetCaption(lpWindowName, WINDOW_ICON_NAME);
 	SetVideoModeToPrimary(*GetOptions().Graphics.fullscreen, windowSize.width, windowSize.height);
-	if (*GetOptions().Gameplay.grabInput)
-		SDL_WM_GrabInput(SDL_GRAB_ON);
 	atexit(SDL_VideoQuit); // Without this video mode is not restored after fullscreen.
 #else
 #ifdef USE_SDL3
@@ -614,7 +621,7 @@ bool SpawnWindow(const char *lpWindowName)
 #else
 	int flags = SDL_WINDOW_ALLOW_HIGHDPI;
 #endif
-	if (*GetOptions().Graphics.upscale) {
+	if (RendererScalingActive()) {
 		if (*GetOptions().Graphics.fullscreen) {
 #ifdef USE_SDL3
 			flags |= SDL_WINDOW_FULLSCREEN;
@@ -622,13 +629,14 @@ bool SpawnWindow(const char *lpWindowName)
 			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 #endif
 		}
-		flags |= SDL_WINDOW_RESIZABLE;
+		if (!Windowed960pActive())
+			flags |= SDL_WINDOW_RESIZABLE;
 	} else if (*GetOptions().Graphics.fullscreen) {
 		flags |= SDL_WINDOW_FULLSCREEN;
 	}
 
 #ifdef USE_SDL3
-	if (*GetOptions().Graphics.upscale) {
+	if (RendererScalingActive()) {
 		if (!SDL_CreateWindowAndRenderer(lpWindowName, windowSize.width, windowSize.height, flags, &ghMainWnd, &renderer)) ErrSdl();
 	} else {
 		ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
@@ -644,19 +652,6 @@ bool SpawnWindow(const char *lpWindowName)
 #else
 	if (SDL_SetWindowDisplayMode(ghMainWnd, &nearestDisplayMode) != 0) ErrSdl();
 #endif
-#endif
-
-// Note: https://github.com/libsdl-org/SDL/issues/962
-// This is a solution to a problem related to SDL mouse grab.
-// See https://github.com/diasurgical/devilutionX/issues/4251
-#ifdef USE_SDL3
-	if (ghMainWnd != nullptr) {
-		SDL_SetWindowMouseGrab(ghMainWnd, *GetOptions().Gameplay.grabInput);
-	}
-#else
-	if (ghMainWnd != nullptr) {
-		SDL_SetWindowGrab(ghMainWnd, *GetOptions().Gameplay.grabInput ? SDL_TRUE : SDL_FALSE);
-	}
 #endif
 
 #endif
@@ -756,7 +751,7 @@ void ReinitializeRenderer()
 	AdjustToScreenGeometry(Size(surface->w, surface->h));
 #else
 
-	if (*GetOptions().Graphics.upscale) {
+	if (RendererScalingActive()) {
 		// We don't recreate the renderer, because this can result in a freezing (not refreshing) rendering
 		if (renderer == nullptr) {
 #ifdef USE_SDL3
@@ -803,6 +798,13 @@ void ReinitializeRenderer()
 		RendererTextureSurface = SDLWrap::CreateRGBSurfaceWithFormat(0, gnScreenWidth, gnScreenHeight, SDL_BITSPERPIXEL(format), format);
 #endif
 	} else {
+		if (renderer != nullptr) {
+			// Scaling was turned off at runtime; release the renderer so drawing goes directly to the window surface.
+			RendererTextureSurface = nullptr;
+			texture = nullptr;
+			SDL_DestroyRenderer(renderer);
+			renderer = nullptr;
+		}
 		Size windowSize = {};
 		SDL_GetWindowSize(ghMainWnd, &windowSize.width, &windowSize.height);
 		AdjustToScreenGeometry(windowSize);
@@ -908,9 +910,9 @@ void ResizeWindow()
 
 #ifndef USE_SDL1
 #ifdef USE_SDL3
-	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr);
+	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr && !Windowed960pActive());
 #else
-	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr ? SDL_TRUE : SDL_FALSE);
+	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr && !Windowed960pActive() ? SDL_TRUE : SDL_FALSE);
 #endif
 	InitializeVirtualGamepad();
 #endif

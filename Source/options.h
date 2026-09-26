@@ -540,6 +540,8 @@ struct GraphicsOptions : OptionCategoryBase {
 	OptionEntryEnum<ScalingQuality> scaleQuality;
 	/** @brief Only scale by values divisible by the width and height. */
 	OptionEntryBoolean integerScaling;
+	/** @brief Run in a fixed 1280x960 window, rendering at 640x480 scaled 2x. */
+	OptionEntryBoolean windowed960p;
 #endif
 	/** @brief Limit frame rate either for vsync or CPU load. */
 	OptionEntryEnum<FrameRateControl> frameRateControl;
@@ -573,8 +575,6 @@ struct GameplayOptions : OptionCategoryBase {
 	OptionEntryInt<int> tickRate;
 	/** @brief Enable double walk speed when in town. */
 	OptionEntryBoolean runInTown;
-	/** @brief Do not let the mouse leave the application window. */
-	OptionEntryBoolean grabInput;
 	/** @brief Pause the game when focus is lost. */
 	OptionEntryBoolean pauseOnFocusLoss;
 	/** @brief Enable the Theo quest. */
