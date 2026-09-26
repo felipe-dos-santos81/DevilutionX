@@ -24,13 +24,22 @@ help: ## Print this help message
 		awk 'BEGIN {FS = ":.*?## "}; \
 		{printf "  \033[36m%-26s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install build dependencies (macOS: brew bundle; Debian/Ubuntu: apt)
+# gettext is keg-only on Homebrew: force-link so msgmerge/msgfmt are on PATH for translations.
+# Homebrew's lua (5.5+) installs headers that shadow sol2's <lua/lua.h> includes and break
+# the build, so it must be unlinked (undo with: brew link lua).
+install: ## Install build dependencies (macOS: Homebrew; Debian/Ubuntu: apt)
+	@[ -s .gitmodules ] && git submodule update --init --recursive || true
 	@if [ "$$(uname)" = "Darwin" ]; then \
 		brew bundle install; \
+		brew link --force gettext >/dev/null 2>&1 || true; \
+		if [ -e "$$(brew --prefix)/include/lua" ] && brew list --versions lua >/dev/null 2>&1; then \
+			echo "Unlinking Homebrew lua (its headers break the build; undo with: brew link lua)"; \
+			brew unlink lua; \
+		fi; \
 	elif command -v apt-get >/dev/null 2>&1; then \
 		sudo apt-get update; \
-		sudo apt-get install -y cmake g++ libsdl2-dev libsodium-dev libpng-dev \
-			libbz2-dev libgtest-dev libgmock-dev libbenchmark-dev libsdl2-image-dev; \
+		sudo apt-get install -y cmake g++ gettext libsdl2-dev libsdl2-image-dev libsodium-dev \
+			libpng-dev libbz2-dev libgtest-dev libgmock-dev libbenchmark-dev; \
 	else \
 		echo "Unsupported platform — see docs/building.md for dependency instructions."; \
 	fi
